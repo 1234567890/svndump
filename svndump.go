@@ -53,7 +53,7 @@ func main() {
 
 	dbPath := flag.String("d", "", "path to wc.db (omit to auto-download from the target)")
 	baseURL := flag.String("u", "", "base URL of the target site")
-	outputDir := flag.String("o", ".", "output directory for downloaded files")
+	outputDir := flag.String("o", ".", "output directory (defaults to target hostname when -d is omitted)")
 	workers := flag.Int("t", 10, "number of concurrent download workers")
 	maxRetries := flag.Int("r", 5, "maximum number of retry attempts per file")
 	flag.Var(&headers, "H", "headers to add to each request (can be used multiple times)")

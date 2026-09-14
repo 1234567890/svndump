@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/rand/v2"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,8 +51,8 @@ func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	dbPath := flag.String("d", "wc.db", "path to wc.db SQLite database")
-	baseURL := flag.String("u", "", "base URL for downloading files")
+	dbPath := flag.String("d", "", "path to wc.db (omit to auto-download from the target)")
+	baseURL := flag.String("u", "", "base URL of the target site")
 	outputDir := flag.String("o", ".", "output directory for downloaded files")
 	workers := flag.Int("t", 10, "number of concurrent download workers")
 	maxRetries := flag.Int("r", 5, "maximum number of retry attempts per file")
@@ -69,11 +70,31 @@ func main() {
 		log.Fatal().Msg("base URL (-u) is required")
 	}
 
+	client := createHTTPClient()
+
+	if *dbPath == "" {
+		parsed, err := url.Parse(*baseURL)
+		if err != nil {
+			log.Fatal().Err(err).Str("url", *baseURL).Msg("failed to parse base URL")
+		}
+
+		if *outputDir == "." {
+			*outputDir = parsed.Hostname()
+		}
+
+		*dbPath = filepath.Join(*outputDir, "wc.db")
+		wcdbURL := strings.TrimRight(*baseURL, "/") + "/.svn/wc.db"
+
+		log.Info().Str("url", wcdbURL).Msg("downloading wc.db")
+		if err := downloadFile(client, wcdbURL, *dbPath, headers); err != nil {
+			log.Fatal().Err(err).Msg("failed to download wc.db")
+		}
+		log.Info().Str("path", *dbPath).Msg("wc.db downloaded")
+	}
+
 	if err := os.MkdirAll(*outputDir, 0o755); err != nil {
 		log.Fatal().Err(err).Str("path", *outputDir).Msg("failed to create output directory")
 	}
-
-	client := createHTTPClient()
 
 	db, err := sql.Open("sqlite", *dbPath)
 	if err != nil {
